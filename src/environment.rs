@@ -20,9 +20,8 @@ impl Environment {
             Strong::new(Value::BuiltinFunction(BuiltinFunctionInner {
                 name: "print",
                 func: Box::new(|args| {
-                    // FIXME: Use `std::fmt::Display` here.
-                    args.into_iter()
-                        .for_each(|arg| println!("{:?}", *arg.get()));
+                    args.into_iter().for_each(|arg| print!("{}", *arg.get()));
+                    println!();
                     Strong::new(Value::Unit)
                 }),
             })),
