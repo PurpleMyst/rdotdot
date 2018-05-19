@@ -1,6 +1,8 @@
 var array1 = ["a" "b" "c"];
 var array2 = ["d" "e" "f"];
 
+# these next two statements don't parse for some reason, so everything is
+# mistakenly reported as "fine" is mistakenly reported as "fine".
 assert ((zip array1 array2)::equals [["a" "d"] ["b" "e"] ["c" "f"]]);
 (zip array1 array2)::foreach "item" {
     print (item::get 0);

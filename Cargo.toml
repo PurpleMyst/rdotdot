@@ -3,4 +3,8 @@ authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
 name = "rdotdot"
 version = "0.1.0"
 [dependencies]
-nom = { version = "4.0.0", features = ["verbose-errors"] }
+reffers = "0.4.2"
+
+[dependencies.nom]
+features = ["verbose-errors"]
+version = "4.0.0"
