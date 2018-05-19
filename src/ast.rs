@@ -4,9 +4,12 @@ pub enum AstNode {
 
     Integer(i64),
 
+    Comment(String),
+
     List(Vec<AstNode>),
 
-    Block(Vec<AstNode>),
+    StatementBlock(Vec<AstNode>),
+    ExpressionBlock(Box<AstNode>),
 
     VariableLookup {
         ident: String,

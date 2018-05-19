@@ -11,9 +11,9 @@ named!(
     pub expression<AstNode>,
     alt!(
         // NB: Order is important.
-        variable_lookup |
         attribute_lookup |
         method_lookup |
+        variable_lookup |
         string |
         integer |
         list |
@@ -25,6 +25,7 @@ named!(
 named!(
     pub statement<AstNode>,
     alt!(
+        comment |
         variable_creation |
         assignment |
         map!(tuple!(method_lookup, multispace0, char!(';')), |t| t.0) |
@@ -33,7 +34,17 @@ named!(
 );
 
 named!(
-    pub function_call<AstNode>,
+    comment<AstNode>,
+    do_parse!(
+        char!('#') >> // hash
+        contents: many0!(none_of!("\n")) >> // contents
+        char!('\n') >> // newline
+        (AstNode::Comment(contents.into_iter().collect()))
+    )
+);
+
+named!(
+    function_call<AstNode>,
     do_parse!(
         func: expression >> // func
         args: many0!(tuple!(multispace0, expression)) >> // args
@@ -141,13 +152,14 @@ named!(
 
 named!(
     block<AstNode>,
-    map!(
-        delimited!(
-            char!('{'),
-            many0!(tuple!(multispace0, statement)),
-            tuple!(multispace0, char!('}'))
+    delimited!(
+        char!('{'),
+        alt!(
+            many1!(tuple!(multispace0, statement)) => {|es: Vec<(&[u8], AstNode)>| AstNode::StatementBlock(es.into_iter().map(|e| e.1).collect())} |
+            tuple!(multispace0, expression) => {|(_, e)| AstNode::ExpressionBlock(Box::new(e)) } |
+            multispace0 => { |_| AstNode::StatementBlock(Vec::new()) }
         ),
-        |es| AstNode::Block(es.into_iter().map(|e| e.1).collect())
+        tuple!(multispace0, char!('}'))
     )
 );
 
