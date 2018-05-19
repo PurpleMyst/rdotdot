@@ -73,7 +73,7 @@ named!(
 named!(
     attribute_lookup<AstNode>,
     do_parse!(
-        expr: alt!(variable_lookup | delimited!(tuple!(char!('('), multispace0), expression, tuple!(multispace0, char!(')')))) >> // expr
+        expr: alt!(variable_lookup | delimited!(tuple!(char!('('), multispace0), function_call, tuple!(multispace0, char!(')')))) >> // expr
         multispace0 >> char!('.') >> // dot
         multispace0 >> attr: identifier >> // attr
         (AstNode::AttributeLookup {
@@ -86,7 +86,7 @@ named!(
 named!(
     method_lookup<AstNode>,
     do_parse!(
-        expr: alt!(variable_lookup | block | delimited!(tuple!(char!('('), multispace0), expression, tuple!(multispace0, char!(')')))) >> // expr
+        expr: alt!(variable_lookup | block | delimited!(tuple!(char!('('), multispace0), function_call, tuple!(multispace0, char!(')')))) >> // expr
         multispace0 >> tag!("::") >> // dot
         multispace0 >> meth: identifier >> // attr
         (AstNode::MethodLookup {
