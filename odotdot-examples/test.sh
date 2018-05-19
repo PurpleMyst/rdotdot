@@ -3,7 +3,7 @@
 
 for file in *.ö; do
     (
-        cargo run "$file" > /dev/null 2> /dev/null;
+        cargo +stable run "$file" > /dev/null 2> /dev/null;
         if [ $? -eq 0 ]; then
             echo "Everything is fine for $file."
         else
