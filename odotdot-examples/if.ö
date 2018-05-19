@@ -1,0 +1,7 @@
+if true {
+    print "everything ok";
+};
+
+if false {
+    print "something is badly wrong";
+};

@@ -1,0 +1,5 @@
+{
+    var a = "hello";
+    print a;    # prints hello
+}::run;
+print a;     # error!
