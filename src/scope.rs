@@ -1,14 +1,14 @@
 use super::{
-    ast::AstNode, chain_map::ChainMap, reffers::rc::Strong, value::{BuiltinFunctionInner, Value},
+    ast::AstNode, chain_map::ChainMap, reffers::rc::Strong, value::{BuiltinFunctionData, Value},
 };
 
-pub struct Environment {
+pub struct Scope {
     variables: ChainMap<String, Strong<Value>>,
 }
 
-impl Environment {
+impl Scope {
     pub fn new() -> Self {
-        Environment {
+        Self {
             variables: ChainMap::new(),
         }
     }
@@ -17,14 +17,11 @@ impl Environment {
         let mut env = Self::new();
         env.set(
             String::from("print"),
-            Strong::new(Value::BuiltinFunction(BuiltinFunctionInner {
-                name: "print",
-                func: Box::new(|args| {
+            Strong::new(Value::builtin_function("print", |args| {
                     args.into_iter().for_each(|arg| print!("{}", *arg.get()));
                     println!();
                     Strong::new(Value::Unit)
-                }),
-            })),
+                })),
         );
         env
     }
@@ -82,7 +79,7 @@ impl Environment {
                 self.enter_scope();
 
                 match &*func.get() {
-                    Value::BuiltinFunction(BuiltinFunctionInner { func, .. }) => {
+                    Value::BuiltinFunction(BuiltinFunctionData { func, .. }) => {
                         func(args);
                     },
 

@@ -1,12 +1,12 @@
 use super::{ast::AstNode, reffers::rc::Strong};
 use std::fmt;
 
-pub struct BuiltinFunctionInner {
+pub struct BuiltinFunctionData {
     pub name: &'static str,
     pub func: Box<Fn(Vec<Strong<Value>>) -> Strong<Value>>,
 }
 
-impl fmt::Debug for BuiltinFunctionInner {
+impl fmt::Debug for BuiltinFunctionData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.name)
     }
@@ -19,7 +19,7 @@ pub enum Value {
     List(Vec<Strong<Value>>),
     StatementBlock(Vec<AstNode>),
     ExpressionBlock(Box<AstNode>),
-    BuiltinFunction(BuiltinFunctionInner),
+    BuiltinFunction(BuiltinFunctionData),
     Unit,
 }
 
@@ -57,5 +57,12 @@ impl Value {
             Value::String(s) => write!(f, "{:?}", s),
             _ => write!(f, "{}", self),
         }
+    }
+
+    pub fn builtin_function(name: &'static str, func: impl Fn(Vec<Strong<Value>>) -> Strong<Value> + 'static) -> Self {
+        Value::BuiltinFunction(BuiltinFunctionData {
+                name: name,
+                func: Box::new(func),
+            })
     }
 }
