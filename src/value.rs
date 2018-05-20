@@ -59,10 +59,13 @@ impl Value {
         }
     }
 
-    pub fn builtin_function(name: &'static str, func: impl Fn(Vec<Strong<Value>>) -> Strong<Value> + 'static) -> Self {
+    pub fn builtin_function(
+        name: &'static str,
+        func: impl Fn(Vec<Strong<Value>>) -> Strong<Value> + 'static,
+    ) -> Self {
         Value::BuiltinFunction(BuiltinFunctionData {
-                name: name,
-                func: Box::new(func),
-            })
+            name: name,
+            func: Box::new(func),
+        })
     }
 }

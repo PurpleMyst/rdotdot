@@ -5,8 +5,8 @@ extern crate reffers;
 
 mod ast;
 mod chain_map;
-mod scope;
 mod parser;
+mod scope;
 mod value;
 
 fn run(code: &[u8]) -> reffers::rc::Strong<value::Value> {
