@@ -30,14 +30,16 @@ impl Environment {
     }
 
     fn get(&self, node: AstNode) -> Strong<Value> {
-        match node {
-            AstNode::VariableLookup { ident } => self.variables
-                .get(ident)
-                .expect("Undefined variable")
-                .clone(),
+        if let AstNode::VariableLookup{ident} = node {
+            if let Some(value) = self.variables.get(&ident) {
+                value.clone()
+            } else {
+                panic!("Undefined variable {:?}", ident);
+            }
+        } else {
 
-            _ => unreachable!("tried to get the variable stored at {:?}", node),
-        }
+         unreachable!("tried to get the variable stored at {:?}", node);
+         }
     }
 
     fn set(&mut self, ident: String, value: Strong<Value>) -> bool {
@@ -82,7 +84,7 @@ impl Environment {
                 match &*func.get() {
                     Value::BuiltinFunction(BuiltinFunctionInner { func, .. }) => {
                         func(args);
-                    }
+                    },
 
                     _ => unreachable!(),
                 }
@@ -98,7 +100,7 @@ impl Environment {
                 Strong::new(Value::Unit)
             }
 
-            AstNode::Assignment { expr: _, value: _ } => unimplemented!(),
+            AstNode::Assignment {.. } => unimplemented!(),
 
             AstNode::Comment(_) => unreachable!(),
         }

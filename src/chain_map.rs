@@ -11,7 +11,7 @@ impl<K: Eq + Hash, V> ChainMap<K, V> {
         }
     }
 
-    pub fn get<'a>(&'a self, key: K) -> Option<&'a V> {
+    pub fn get<'a>(&'a self, key: &K) -> Option<&'a V> {
         self.maps
             .iter()
             .rev()
