@@ -30,7 +30,7 @@ impl Scope {
         ctx
     }
 
-    fn get(&self, node: AstNode) -> Strong<Value> {
+    fn get(&mut self, node: AstNode) -> Strong<Value> {
         match node {
             AstNode::VariableLookup { ident } => {
                 if let Some(value) = self.variables.get(&ident) {
@@ -39,6 +39,12 @@ impl Scope {
                     panic!("Undefined variable {:?}", ident);
                 }
             }
+
+            AstNode::MethodLookup {expr, meth } => {
+                let expr = self.eval(*expr);
+                expr.get().get_method(meth)
+            }
+
             _ => {
                 unimplemented!("Scope::get(self, {:?})", node);
             }
@@ -48,6 +54,7 @@ impl Scope {
     fn set(&mut self, place: AstNode, value: Strong<Value>) -> bool {
         match place {
             AstNode::VariableLookup { ident } => self.variables.set(ident, value),
+
             _ => unimplemented!("Scope::set(self, {:?}, {:?})", place, value),
         }
     }

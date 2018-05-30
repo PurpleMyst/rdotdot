@@ -68,4 +68,10 @@ impl Value {
             func: Box::new(func),
         })
     }
+
+    pub fn get_method(&self, meth: String) -> Strong<Value> {
+        match self {
+            _ => unimplemented!("Value::get_method(&self, {:?})", meth),
+        }
+    }
 }
