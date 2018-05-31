@@ -21,7 +21,7 @@ script_dir=$(readlink -f "$(dirname "$0")")
 output=$(realpath --relative-to=. "${script_dir}/output")
 
 mkdir -p "$output"
-info "Output directory is ${output}" 1
+info "Output directory is ${output}"
 
 info "Testing rdotdot ..."
 cargo +stable test

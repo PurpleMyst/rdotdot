@@ -1,4 +1,8 @@
+use super::ast::AstNode;
+
 use peeking_take_while::PeekableExt;
+
+use std::iter::Peekable;
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -107,11 +111,38 @@ pub fn tokenize(code: &str) -> Vec<Token> {
 
             c if c.is_whitespace() => continue,
 
-            _ => unimplemented!(),
+            '{' => Token::LeftCurly,
+            '}' => Token::RightCurly,
+
+            '[' => Token::LeftBracket,
+            ']' => Token::RightBracket,
+
+            '(' => Token::LeftParenthesis,
+            ')' => Token::RightParenthesis,
+
+            '=' => Token::Equals,
+
+            ';' => Token::Semicolon,
+
+            '.' => Token::Dot,
+
+            '`' => Token::Backtick,
+
+            ':' => {
+                if code_chars.next().map(|c| c != ':').unwrap_or(true) {
+                    // TODO: Better error message + don't panic.
+                    panic!("Tokenizing error while double coloning.");
+                }
+
+                Token::DoubleColon
+            }
+
+            c => unimplemented!("{:?}", c),
         };
 
         result.push(token);
     }
 
+    debug_assert!(code_chars.next().is_none());
     result
 }

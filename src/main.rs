@@ -4,12 +4,7 @@ mod ast;
 mod parser;
 
 fn main() {
-    let code = r#"
-        # this is a comment
-        "abcdef"
-        identifier1 identifier2
-        123 56 123abc
-    "#;
+    let code = std::fs::read_to_string(std::env::args().nth(1).expect("USAGE: cargo run FILENAME")).expect("Error while reading");
 
-    println!("{:#?}", parser::tokenize(code.trim()));
+    println!("{:#?}", parser::tokenize(&code));
 }
