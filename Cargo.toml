@@ -5,6 +5,7 @@ version = "0.1.0"
 [dependencies]
 peeking_take_while = "0.1.2"
 reffers = "0.4.2"
+rpds = "0.5.0"
 
 [dependencies.nom]
 features = ["verbose-errors"]
