@@ -205,6 +205,35 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), List<To
             }
         }
 
+        // FIXME Support expression blocks.
+        Some(Token::LeftCurly) => {
+            let original_tokens = tokens.clone();
+            tokens.drop_first_mut();
+
+            let mut result = Vec::new();
+
+            loop {
+                match statement(tokens) {
+                    Ok((new_tokens, node)) => {
+                        result.push(node);
+                        tokens = new_tokens;
+                    }
+
+                    Err(new_tokens) => {
+                        tokens = new_tokens;
+                        break;
+                    }
+                }
+            }
+
+            if tokens.first().cloned() != Some(Token::RightCurly) {
+                return Err(original_tokens);
+            }
+            tokens.drop_first_mut();
+
+            AstNode::BlockStatement(result)
+        }
+
         _ => return Err(tokens),
     };
 
