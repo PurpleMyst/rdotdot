@@ -7,5 +7,6 @@ pub enum AstNode {
         func: Box<AstNode>,
         args: Vec<AstNode>,
     },
-    BlockStatement(Vec<AstNode>)
+    BlockStatement(Vec<AstNode>),
+    VarDeclaration(String, Box<AstNode>),
 }

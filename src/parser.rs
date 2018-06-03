@@ -1,3 +1,16 @@
+// TODO:
+//
+// Expressions:
+//    Attribute lookups
+//    Method lookups
+//    List literals
+//    Infix function calls
+//    Expression blocks
+//
+// Statements:
+//    Assignment
+//    Attribute setting
+
 use super::ast::AstNode;
 
 use peeking_take_while::PeekableExt;
@@ -148,10 +161,20 @@ fn tokenize(code: &str) -> Vec<Token> {
 #[derive(Debug, Clone)]
 pub struct ParsingError(String);
 
-impl From<String> for ParsingError { fn from(s: String) -> Self { ParsingError(s) } }
-impl<'a> From<&'a str> for ParsingError { fn from(s: &'a str) -> Self { ParsingError(s.to_owned()) } }
+impl From<String> for ParsingError {
+    fn from(s: String) -> Self {
+        ParsingError(s)
+    }
+}
+impl<'a> From<&'a str> for ParsingError {
+    fn from(s: &'a str) -> Self {
+        ParsingError(s.to_owned())
+    }
+}
 
-fn function_call(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
+fn function_call(
+    mut tokens: List<Token>,
+) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let original_tokens = tokens.clone();
 
     let mut result = Vec::new();
@@ -172,14 +195,24 @@ fn function_call(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (Lis
         }
     }
 
-    if result.len() == 0 { return Err((original_tokens, ParsingError::from(format!("Empty function call expression ( last argument error {} )", last_error.0)))) }
+    if result.len() == 0 {
+        return Err((
+            original_tokens,
+            ParsingError::from(format!(
+                "Empty function call expression ( last argument error {} )",
+                last_error.0
+            )),
+        ));
+    }
 
     let func = Box::new(result.drain(0..1).next().unwrap());
 
     Ok((tokens, AstNode::FunctionCall { func, args: result }))
 }
 
-fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
+fn expression(
+    mut tokens: List<Token>,
+) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let node = match tokens.first().map(ToOwned::to_owned) {
         Some(Token::StringLiteral(s)) => {
             tokens.drop_first_mut();
@@ -191,7 +224,10 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<T
             AstNode::IntegerLiteral(n)
         }
 
-        Some(Token::Identifier(s)) => { tokens.drop_first_mut(); AstNode::VariableLookup(s) },
+        Some(Token::Identifier(s)) => {
+            tokens.drop_first_mut();
+            AstNode::VariableLookup(s)
+        }
 
         Some(Token::LeftParenthesis) => {
             let original_tokens = tokens.clone();
@@ -202,7 +238,10 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<T
                     if !new_tokens.drop_first_mut()
                         || new_tokens.first().cloned() != Some(Token::RightParenthesis)
                     {
-                        return Err((original_tokens, ParsingError::from("Missing right parenthesis.")));
+                        return Err((
+                            original_tokens,
+                            ParsingError::from("Missing right parenthesis."),
+                        ));
                     } else {
                         assert!(new_tokens.drop_first_mut());
                     }
@@ -214,7 +253,6 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<T
             }
         }
 
-        // FIXME Support expression blocks.
         Some(Token::LeftCurly) => {
             let original_tokens = tokens.clone();
             tokens.drop_first_mut();
@@ -243,7 +281,12 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<T
             AstNode::BlockStatement(result)
         }
 
-        t => return Err((tokens, ParsingError::from(format!("Unexpected token {:?}", t)))),
+        t => {
+            return Err((
+                tokens,
+                ParsingError::from(format!("Unexpected token {:?}", t)),
+            ))
+        }
     };
 
     Ok((tokens, node))
@@ -252,15 +295,48 @@ fn expression(mut tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<T
 fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let original_tokens = tokens.clone();
 
-    let (mut tokens, node) = function_call(tokens)?;
+    match function_call(tokens) {
+        Ok((mut tokens, node)) => {
+            if tokens.first().cloned() != Some(Token::Semicolon) {
+                return Err((original_tokens, ParsingError::from("Missing semicolon.")));
+            }
 
-    if tokens.first().cloned() != Some(Token::Semicolon) {
-        return Err((original_tokens, ParsingError::from("Missing semicolon.")));
+            tokens.drop_first_mut();
+
+            Ok((tokens, node))
+        }
+
+        Err((tokens, _)) => {
+            let var_declaration = |mut tokens: List<Token>| {
+                let original_tokens = tokens.clone();
+                if tokens.first().cloned() == Some(Token::Var) {
+                    tokens.drop_first_mut();
+
+                    if let Some(Token::Identifier(lhs)) = tokens.first().cloned() {
+                        tokens.drop_first_mut();
+
+                        if let Some(Token::Equals) = tokens.first() {
+                            match expression(tokens) {
+                                Ok((tokens, rhs)) => {
+                                    return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))))
+                                }
+
+                                Err(_) => {}
+                            }
+                        }
+                    }
+                }
+
+                return Err((original_tokens, ParsingError::from("Not a var statement.")));
+            };
+
+            let assignment = |tokens| {
+                unimplemented!("assignment");
+            };
+
+            var_declaration(tokens).or_else(|(tokens, _)| assignment(tokens))
+        }
     }
-
-    tokens.drop_first_mut();
-
-    Ok((tokens, node))
 }
 
 pub fn parse(code: &str) -> Result<Vec<AstNode>, ParsingError> {
