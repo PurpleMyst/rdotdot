@@ -2,8 +2,6 @@
 //
 // Expressions:
 //    Attribute lookups
-//    Method lookups
-//    List literals
 //    Infix function calls
 //    Expression blocks
 //
@@ -12,6 +10,7 @@
 //
 // Misc:
 //    Better errors!
+//    Refactor this code. Heavily.
 
 use super::ast::AstNode;
 
@@ -288,28 +287,49 @@ fn expression(
             let original_tokens = tokens.clone();
             tokens.drop_first_mut();
 
-            let mut result = Vec::new();
+            let node = {
+                {
+                    let mut result = Vec::new();
 
-            loop {
-                match statement(tokens) {
-                    Ok((new_tokens, node)) => {
-                        result.push(node);
-                        tokens = new_tokens;
+                    loop {
+                        match statement(tokens) {
+                            Ok((new_tokens, node)) => {
+                                result.push(node);
+                                tokens = new_tokens;
+                            }
+
+                            Err((new_tokens, _)) => {
+                                tokens = new_tokens;
+                                break;
+                            }
+                        }
                     }
 
-                    Err((new_tokens, _)) => {
-                        tokens = new_tokens;
-                        break;
+                    if result.is_empty() {
+                        match expression(tokens) {
+                            Ok((new_tokens, expr)) => {
+                                tokens = new_tokens;
+                                AstNode::ExpressionBlock(Box::new(expr))
+                            }
+                            Err(_) => {
+                                return Err((
+                                    original_tokens,
+                                    ParsingError::from("syntax error in block"),
+                                ))
+                            }
+                        }
+                    } else {
+                        AstNode::StatementBlock(result)
                     }
                 }
-            }
+            };
 
             if tokens.first().cloned() != Some(Token::RightCurly) {
                 return Err((original_tokens, ParsingError::from("missing right curly.")));
             }
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
 
-            AstNode::BlockStatement(result)
+            node
         }
 
         t => {
@@ -326,76 +346,60 @@ fn expression(
 fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let original_tokens = tokens.clone();
 
-    match function_call(tokens) {
-        Ok((mut tokens, node)) => {
-            if tokens.first().cloned() != Some(Token::Semicolon) {
-                return Err((original_tokens, ParsingError::from("Missing semicolon.")));
-            }
+    {
+        let var_declaration = |mut tokens: List<Token>| {
+            let original_tokens = tokens.clone();
+            if tokens.first().cloned() == Some(Token::Var) {
+                tokens.drop_first_mut();
 
-            tokens.drop_first_mut();
-
-            Ok((tokens, node))
-        }
-
-        Err((tokens, _)) => {
-            let var_declaration = |mut tokens: List<Token>| {
-                let original_tokens = tokens.clone();
-                if tokens.first().cloned() == Some(Token::Var) {
+                if let Some(Token::Identifier(lhs)) = tokens.first().cloned() {
                     tokens.drop_first_mut();
 
-                    if let Some(Token::Identifier(lhs)) = tokens.first().cloned() {
+                    if let Some(Token::Equals) = tokens.first() {
                         tokens.drop_first_mut();
 
-                        if let Some(Token::Equals) = tokens.first() {
-                            tokens.drop_first_mut();
-
-                            match expression(tokens) {
-                                Ok((mut tokens, rhs)) => {
-                                    if tokens.first().cloned() != Some(Token::Semicolon) {
-                                        return Err((
-                                            original_tokens,
-                                            ParsingError::from("Missing semicolon."),
-                                        ));
-                                    }
-
-                                    tokens.drop_first_mut();
-
-                                    return Ok((
-                                        tokens,
-                                        AstNode::VarDeclaration(lhs, Box::new(rhs)),
-                                    ));
-                                }
-
-                                Err(_) => {}
+                        match expression(tokens) {
+                            Ok((mut tokens, rhs)) => {
+                                return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))));
                             }
+
+                            Err(_) => {}
                         }
                     }
                 }
+            }
 
-                return Err((original_tokens, ParsingError::from("Not a var statement.")));
-            };
+            return Err((original_tokens, ParsingError::from("Not a var statement.")));
+        };
 
-            let assignment = |tokens: List<Token>| {
-                let original_tokens = tokens.clone();
+        let assignment = |tokens: List<Token>| {
+            let original_tokens = tokens.clone();
 
-                expression(tokens).and_then(|(mut tokens, lhs)| {
-                    if tokens.first().cloned() == Some(Token::Equals) {
-                        tokens.drop_first_mut();
-                        expression(tokens)
-                            .map(|(tokens, rhs)| {
-                                (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs)))
-                            })
-                            .map_err(|_| {
-                                (original_tokens, ParsingError::from("Not an assignment²."))
-                            })
-                    } else {
-                        Err((original_tokens, ParsingError::from("Not an assignment.")))
-                    }
-                })
-            };
+            expression(tokens).and_then(|(mut tokens, lhs)| {
+                if tokens.first().cloned() == Some(Token::Equals) {
+                    tokens.drop_first_mut();
+                    expression(tokens)
+                        .map(|(tokens, rhs)| {
+                            (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs)))
+                        })
+                        .map_err(|_| (original_tokens, ParsingError::from("Not an assignment².")))
+                } else {
+                    Err((original_tokens, ParsingError::from("Not an assignment.")))
+                }
+            })
+        };
 
-            var_declaration(tokens).or_else(|(tokens, _)| assignment(tokens))
-        }
+        var_declaration(tokens)
+            .or_else(|(tokens, _)| assignment(tokens))
+            .or_else(|(tokens, _)| function_call(tokens))
+            .and_then(|(mut tokens, value)| {
+                if tokens.first().cloned() != Some(Token::Semicolon) {
+                    return Err((original_tokens, ParsingError::from("Missing semicolon.")));
+                }
+
+                assert!(tokens.drop_first_mut());
+                Ok((tokens, value))
+            })
     }
 }
 
