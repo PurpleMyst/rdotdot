@@ -1,3 +1,0 @@
-var l = [ 1 2 3 ];
-var empty = [];
-var nested = [ 1 [ 2 [ 3 [ 4 [] ] ] ] ];
