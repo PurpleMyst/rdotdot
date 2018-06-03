@@ -1,15 +1,11 @@
 // TODO:
 //
 // Expressions:
-//    Attribute lookups
 //    Infix function calls
-//    Expression blocks
-//
-// Statements:
-//    Attribute setting
 //
 // Misc:
 //    Better errors!
+//    Remove a few `.cloned()`
 //    Refactor this code. Heavily.
 
 use super::ast::AstNode;
@@ -41,8 +37,6 @@ enum Token {
     Dot,
 
     Backtick,
-
-    DoubleColon,
 
     Var,
 }
@@ -139,15 +133,6 @@ fn tokenize(code: &str) -> Vec<Token> {
             '.' => Token::Dot,
 
             '`' => Token::Backtick,
-
-            ':' => {
-                if code_chars.next().map(|c| c != ':').unwrap_or(true) {
-                    // TODO: Better error message + don't panic.
-                    panic!("Tokenizing error while double coloning.");
-                }
-
-                Token::DoubleColon
-            }
 
             c => unimplemented!("{:?}", c),
         };
@@ -311,11 +296,10 @@ fn expression(
                                 tokens = new_tokens;
                                 AstNode::ExpressionBlock(Box::new(expr))
                             }
-                            Err(_) => {
-                                return Err((
-                                    original_tokens,
-                                    ParsingError::from("syntax error in block"),
-                                ))
+
+                            Err((new_tokens, _)) => {
+                                tokens = new_tokens;
+                                AstNode::StatementBlock(result)
                             }
                         }
                     } else {
@@ -340,7 +324,29 @@ fn expression(
         }
     };
 
-    Ok((tokens, node))
+    let original_tokens = tokens.clone();
+
+    if tokens.first().cloned() == Some(Token::Dot) {
+        let mut attrs = Vec::new();
+
+        while tokens.first() == Some(&Token::Dot) {
+            assert!(tokens.drop_first_mut());
+
+            if let Some(Token::Identifier(attr)) = tokens.first().cloned() {
+                assert!(tokens.drop_first_mut());
+                attrs.push(attr);
+            } else {
+                return Err((
+                    original_tokens,
+                    ParsingError::from("not an identifier after dot"),
+                ));
+            }
+        }
+
+        Ok((tokens, AstNode::AttributeLookup(Box::new(node), attrs)))
+    } else {
+        Ok((tokens, node))
+    }
 }
 
 fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {

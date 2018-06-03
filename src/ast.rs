@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum AstNode {
     StringLiteral(String),
+    AttributeLookup(Box<AstNode>, Vec<String>),
     VariableLookup(String),
     IntegerLiteral(i64),
     FunctionCall {
