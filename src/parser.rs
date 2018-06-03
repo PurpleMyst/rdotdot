@@ -9,6 +9,9 @@
 //
 // Statements:
 //    Attribute setting
+//
+// Misc:
+//    Better errors!
 
 use super::ast::AstNode;
 
@@ -234,9 +237,7 @@ fn expression(
 
             match function_call(tokens) {
                 Ok((mut new_tokens, node)) => {
-                    if !new_tokens.drop_first_mut()
-                        || new_tokens.first().cloned() != Some(Token::RightParenthesis)
-                    {
+                    if new_tokens.first().cloned() != Some(Token::RightParenthesis) {
                         return Err((
                             original_tokens,
                             ParsingError::from("Missing right parenthesis."),
@@ -250,6 +251,37 @@ fn expression(
 
                 Err((_, e)) => return Err((original_tokens, e)),
             }
+        }
+
+        Some(Token::LeftBracket) => {
+            let original_tokens = tokens.clone();
+            tokens.drop_first_mut();
+            let mut contents = Vec::new();
+
+            loop {
+                match expression(tokens) {
+                    Ok((new_tokens, node)) => {
+                        tokens = new_tokens;
+                        contents.push(node)
+                    }
+
+                    Err((new_tokens, _)) => {
+                        tokens = new_tokens;
+                        break;
+                    }
+                }
+            }
+
+            if tokens.first().cloned() != Some(Token::RightBracket) {
+                return Err((
+                    original_tokens,
+                    ParsingError::from("Missing right bracket."),
+                ));
+            } else {
+                assert!(tokens.drop_first_mut());
+            }
+
+            AstNode::List(contents)
         }
 
         Some(Token::LeftCurly) => {
@@ -320,12 +352,18 @@ fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>
                             match expression(tokens) {
                                 Ok((mut tokens, rhs)) => {
                                     if tokens.first().cloned() != Some(Token::Semicolon) {
-                                        return Err((original_tokens, ParsingError::from("Missing semicolon.")));
+                                        return Err((
+                                            original_tokens,
+                                            ParsingError::from("Missing semicolon."),
+                                        ));
                                     }
 
                                     tokens.drop_first_mut();
 
-                                    return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))))
+                                    return Ok((
+                                        tokens,
+                                        AstNode::VarDeclaration(lhs, Box::new(rhs)),
+                                    ));
                                 }
 
                                 Err(_) => {}
@@ -343,14 +381,17 @@ fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>
                 expression(tokens).and_then(|(mut tokens, lhs)| {
                     if tokens.first().cloned() == Some(Token::Equals) {
                         tokens.drop_first_mut();
-                        expression(tokens).map(|(tokens, rhs)| (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs))))
-                                    .map_err(|_| (original_tokens, ParsingError::from("Not an assignment².")))
+                        expression(tokens)
+                            .map(|(tokens, rhs)| {
+                                (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs)))
+                            })
+                            .map_err(|_| {
+                                (original_tokens, ParsingError::from("Not an assignment²."))
+                            })
                     } else {
                         Err((original_tokens, ParsingError::from("Not an assignment.")))
                     }
                 })
-
-
             };
 
             var_declaration(tokens).or_else(|(tokens, _)| assignment(tokens))
