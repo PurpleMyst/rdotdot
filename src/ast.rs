@@ -9,4 +9,5 @@ pub enum AstNode {
     },
     BlockStatement(Vec<AstNode>),
     VarDeclaration(String, Box<AstNode>),
+    Assignment(Box<AstNode>, Box<AstNode>),
 }

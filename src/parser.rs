@@ -8,7 +8,6 @@
 //    Expression blocks
 //
 // Statements:
-//    Assignment
 //    Attribute setting
 
 use super::ast::AstNode;
@@ -317,7 +316,13 @@ fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>
 
                         if let Some(Token::Equals) = tokens.first() {
                             match expression(tokens) {
-                                Ok((tokens, rhs)) => {
+                                Ok((mut tokens, rhs)) => {
+                                    if tokens.first().cloned() != Some(Token::Semicolon) {
+                                        return Err((original_tokens, ParsingError::from("Missing semicolon.")));
+                                    }
+
+                                    tokens.drop_first_mut();
+
                                     return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))))
                                 }
 
@@ -330,8 +335,20 @@ fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>
                 return Err((original_tokens, ParsingError::from("Not a var statement.")));
             };
 
-            let assignment = |tokens| {
-                unimplemented!("assignment");
+            let assignment = |tokens: List<Token>| {
+                let original_tokens = tokens.clone();
+
+                expression(tokens).and_then(|(mut tokens, lhs)| {
+                    if tokens.first().cloned() == Some(Token::Equals) {
+                        tokens.drop_first_mut();
+                        expression(tokens).map(|(tokens, rhs)| (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs))))
+                                    .map_err(|_| (original_tokens, ParsingError::from("Not an assignment².")))
+                    } else {
+                        Err((original_tokens, ParsingError::from("Not an assignment.")))
+                    }
+                })
+
+
             };
 
             var_declaration(tokens).or_else(|(tokens, _)| assignment(tokens))
