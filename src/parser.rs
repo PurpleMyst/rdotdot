@@ -315,6 +315,8 @@ fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>
                         tokens.drop_first_mut();
 
                         if let Some(Token::Equals) = tokens.first() {
+                            tokens.drop_first_mut();
+
                             match expression(tokens) {
                                 Ok((mut tokens, rhs)) => {
                                     if tokens.first().cloned() != Some(Token::Semicolon) {
@@ -367,8 +369,8 @@ pub fn parse(code: &str) -> Result<Vec<AstNode>, ParsingError> {
                 tokens = new_tokens;
             }
 
-            Err((_new_tokens, e)) => {
-                if result.is_empty() {
+            Err((new_tokens, e)) => {
+                if !new_tokens.is_empty() {
                     return Err(e);
                 }
 
