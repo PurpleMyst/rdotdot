@@ -1,5 +1,5 @@
 #![deny(future_incompatible)]
-#[warn(rust_2018_compatibility, rust_2018_idioms)]
+#![warn(rust_2018_compatibility, rust_2018_idioms)]
 extern crate peeking_take_while;
 extern crate rpds;
 

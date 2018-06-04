@@ -164,9 +164,30 @@ fn function_call(
     let original_tokens = tokens.clone();
 
     let mut result = Vec::new();
-    let last_error;
+    let mut last_error = None;
+
+    #[derive(PartialEq, Eq)]
+    enum BacktickState {
+        NoneFound,
+        InBacktick,
+        OutOfBacktick,
+    }
+    let mut backtick = BacktickState::NoneFound;
 
     loop {
+        if tokens.first() == Some(&Token::Backtick) {
+            assert!(tokens.drop_first_mut());
+
+            if backtick == BacktickState::NoneFound {
+                backtick = BacktickState::InBacktick;
+            } else {
+                return Err((
+                    original_tokens,
+                    ParsingError::from("multiple backticks in function call"),
+                ));
+            }
+        }
+
         match expression(tokens) {
             Ok((new_tokens, node)) => {
                 tokens = new_tokens;
@@ -175,7 +196,26 @@ fn function_call(
 
             Err((new_tokens, e)) => {
                 tokens = new_tokens;
-                last_error = e;
+                last_error = Some(e);
+                break;
+            }
+        }
+
+        match backtick {
+            BacktickState::NoneFound => {}
+            BacktickState::InBacktick => {
+                if tokens.first() == Some(&Token::Backtick) {
+                    assert!(tokens.drop_first_mut());
+                    backtick = BacktickState::OutOfBacktick
+                } else {
+                    return Err((
+                        original_tokens,
+                        ParsingError::from("expected closing backtick"),
+                    ));
+                }
+            }
+            BacktickState::OutOfBacktick => {
+                result.swap(0, 1);
                 break;
             }
         }
@@ -185,8 +225,8 @@ fn function_call(
         return Err((
             original_tokens,
             ParsingError::from(format!(
-                "Empty function call expression ( last argument error {} )",
-                last_error.0
+                "Empty function call expression ( last argument error {:?} )",
+                last_error
             )),
         ));
     }
