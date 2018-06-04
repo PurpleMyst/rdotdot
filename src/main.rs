@@ -1,5 +1,10 @@
+#![warn(
+    anonymous_parameters, bare_trait_object, missing_copy_implementations,
+    missing_debug_implementations, trivial_casts, trivial_numeric_casts, unreachable_pub,
+    unsafe_code, unstable_features, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results, variant_size_differences
+)]
 #![deny(future_incompatible)]
-#![warn(rust_2018_compatibility, rust_2018_idioms)]
 extern crate peeking_take_while;
 extern crate rpds;
 

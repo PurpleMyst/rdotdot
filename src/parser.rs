@@ -1,12 +1,7 @@
 // TODO:
 //
-// Expressions:
-//    Infix function calls
-//
 // Misc:
 //    Better errors!
-//    Remove a few `.cloned()`
-//    Refactor this code. Heavily.
 
 use super::ast::AstNode;
 
@@ -55,10 +50,12 @@ fn tokenize(code: &str) -> Vec<Token> {
 
         let token = match c {
             '#' => {
+                // NB: We use `take_while` over `peeking_take_while` because we want to consume the
+                // newline.
                 code_chars
                     .by_ref()
                     .take_while(|&c| c != '\n')
-                    .for_each(|_| {});
+                    .for_each(|_| {}); // exhaust!
                 continue;
             }
 
@@ -140,10 +137,11 @@ fn tokenize(code: &str) -> Vec<Token> {
         result.push(token);
     }
 
-    debug_assert!(code_chars.next().is_none());
+    assert!(code_chars.next().is_none());
     result
 }
 
+// TODO: Use `Cow<'static, str>`.
 #[derive(Debug, Clone)]
 pub struct ParsingError(String);
 
@@ -152,6 +150,7 @@ impl From<String> for ParsingError {
         ParsingError(s)
     }
 }
+
 impl<'a> From<&'a str> for ParsingError {
     fn from(s: &'a str) -> Self {
         ParsingError(s.to_owned())
@@ -161,25 +160,25 @@ impl<'a> From<&'a str> for ParsingError {
 fn function_call(
     mut tokens: List<Token>,
 ) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
+    #[derive(PartialEq, Eq)]
+    enum BacktickState {
+        NoBackticksFound,
+        InsideBackticks,
+        AfterBackticks,
+    }
+
     let original_tokens = tokens.clone();
 
     let mut result = Vec::new();
     let mut last_error = None;
-
-    #[derive(PartialEq, Eq)]
-    enum BacktickState {
-        NoneFound,
-        InBacktick,
-        OutOfBacktick,
-    }
-    let mut backtick = BacktickState::NoneFound;
+    let mut backtick_state = BacktickState::NoBackticksFound;
 
     loop {
         if tokens.first() == Some(&Token::Backtick) {
             assert!(tokens.drop_first_mut());
 
-            if backtick == BacktickState::NoneFound {
-                backtick = BacktickState::InBacktick;
+            if backtick_state == BacktickState::NoBackticksFound {
+                backtick_state = BacktickState::InsideBackticks;
             } else {
                 return Err((
                     original_tokens,
@@ -201,20 +200,25 @@ fn function_call(
             }
         }
 
-        match backtick {
-            BacktickState::NoneFound => {}
-            BacktickState::InBacktick => {
+        match backtick_state {
+            BacktickState::NoBackticksFound => {}
+
+            BacktickState::InsideBackticks => {
                 if tokens.first() == Some(&Token::Backtick) {
                     assert!(tokens.drop_first_mut());
-                    backtick = BacktickState::OutOfBacktick
+                    backtick_state = BacktickState::AfterBackticks;
                 } else {
                     return Err((
                         original_tokens,
-                        ParsingError::from("expected closing backtick"),
+                        ParsingError::from("Expected closing backtick"),
                     ));
                 }
             }
-            BacktickState::OutOfBacktick => {
+
+            BacktickState::AfterBackticks => {
+                // To avoid complicating the code, we just treat the function itself as part of the
+                // `result` vec. Of course, the function is actually the second element of the
+                // result vector, not the first, so we swap and everything else happens as normal.
                 result.swap(0, 1);
                 break;
             }
@@ -231,7 +235,7 @@ fn function_call(
         ));
     }
 
-    let func = Box::new(result.drain(0..1).next().unwrap());
+    let func = Box::new(result.remove(0));
 
     Ok((tokens, AstNode::FunctionCall { func, args: result }))
 }
@@ -241,27 +245,27 @@ fn expression(
 ) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let node = match tokens.first().map(ToOwned::to_owned) {
         Some(Token::StringLiteral(s)) => {
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
             AstNode::StringLiteral(s)
         }
 
         Some(Token::IntegerLiteral(n)) => {
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
             AstNode::IntegerLiteral(n)
         }
 
         Some(Token::Identifier(s)) => {
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
             AstNode::VariableLookup(s)
         }
 
         Some(Token::LeftParenthesis) => {
             let original_tokens = tokens.clone();
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
 
             match function_call(tokens) {
                 Ok((mut new_tokens, node)) => {
-                    if new_tokens.first().cloned() != Some(Token::RightParenthesis) {
+                    if new_tokens.first() != Some(&Token::RightParenthesis) {
                         return Err((
                             original_tokens,
                             ParsingError::from("Missing right parenthesis."),
@@ -279,7 +283,7 @@ fn expression(
 
         Some(Token::LeftBracket) => {
             let original_tokens = tokens.clone();
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
             let mut contents = Vec::new();
 
             loop {
@@ -296,7 +300,7 @@ fn expression(
                 }
             }
 
-            if tokens.first().cloned() != Some(Token::RightBracket) {
+            if tokens.first() != Some(&Token::RightBracket) {
                 return Err((
                     original_tokens,
                     ParsingError::from("Missing right bracket."),
@@ -310,7 +314,7 @@ fn expression(
 
         Some(Token::LeftCurly) => {
             let original_tokens = tokens.clone();
-            tokens.drop_first_mut();
+            assert!(tokens.drop_first_mut());
 
             let node = {
                 {
@@ -348,7 +352,7 @@ fn expression(
                 }
             };
 
-            if tokens.first().cloned() != Some(Token::RightCurly) {
+            if tokens.first() != Some(&Token::RightCurly) {
                 return Err((original_tokens, ParsingError::from("missing right curly.")));
             }
             assert!(tokens.drop_first_mut());
@@ -364,9 +368,8 @@ fn expression(
         }
     };
 
-    let original_tokens = tokens.clone();
-
-    if tokens.first().cloned() == Some(Token::Dot) {
+    if tokens.first() == Some(&Token::Dot) {
+        let original_tokens = tokens.clone();
         let mut attrs = Vec::new();
 
         while tokens.first() == Some(&Token::Dot) {
@@ -392,61 +395,59 @@ fn expression(
 fn statement(tokens: List<Token>) -> Result<(List<Token>, AstNode), (List<Token>, ParsingError)> {
     let original_tokens = tokens.clone();
 
-    {
-        let var_declaration = |mut tokens: List<Token>| {
-            let original_tokens = tokens.clone();
-            if tokens.first().cloned() == Some(Token::Var) {
-                tokens.drop_first_mut();
+    let var_declaration = |mut tokens: List<Token>| {
+        let original_tokens = tokens.clone();
+        if tokens.first() == Some(&Token::Var) {
+            assert!(tokens.drop_first_mut());
 
-                if let Some(Token::Identifier(lhs)) = tokens.first().cloned() {
-                    tokens.drop_first_mut();
+            if let Some(Token::Identifier(lhs)) = tokens.first().cloned() {
+                assert!(tokens.drop_first_mut());
 
-                    if let Some(Token::Equals) = tokens.first() {
-                        tokens.drop_first_mut();
+                if let Some(Token::Equals) = tokens.first() {
+                    assert!(tokens.drop_first_mut());
 
-                        match expression(tokens) {
-                            Ok((mut tokens, rhs)) => {
-                                return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))));
-                            }
-
-                            Err(_) => {}
+                    match expression(tokens) {
+                        Ok((mut tokens, rhs)) => {
+                            return Ok((tokens, AstNode::VarDeclaration(lhs, Box::new(rhs))));
                         }
+
+                        Err(_) => {}
                     }
                 }
             }
+        }
 
-            return Err((original_tokens, ParsingError::from("Not a var statement.")));
-        };
+        return Err((original_tokens, ParsingError::from("Not a var statement.")));
+    };
 
-        let assignment = |tokens: List<Token>| {
-            let original_tokens = tokens.clone();
+    let assignment = |tokens: List<Token>| {
+        let original_tokens = tokens.clone();
 
-            expression(tokens).and_then(|(mut tokens, lhs)| {
-                if tokens.first().cloned() == Some(Token::Equals) {
-                    tokens.drop_first_mut();
-                    expression(tokens)
-                        .map(|(tokens, rhs)| {
-                            (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs)))
-                        })
-                        .map_err(|_| (original_tokens, ParsingError::from("Not an assignment².")))
-                } else {
-                    Err((original_tokens, ParsingError::from("Not an assignment.")))
-                }
-            })
-        };
-
-        var_declaration(tokens)
-            .or_else(|(tokens, _)| assignment(tokens))
-            .or_else(|(tokens, _)| function_call(tokens))
-            .and_then(|(mut tokens, value)| {
-                if tokens.first().cloned() != Some(Token::Semicolon) {
-                    return Err((original_tokens, ParsingError::from("Missing semicolon.")));
-                }
-
+        expression(tokens).and_then(|(mut tokens, lhs)| {
+            if tokens.first() == Some(&Token::Equals) {
                 assert!(tokens.drop_first_mut());
-                Ok((tokens, value))
-            })
-    }
+                expression(tokens)
+                    .map(|(tokens, rhs)| {
+                        (tokens, AstNode::Assignment(Box::new(lhs), Box::new(rhs)))
+                    })
+                    .map_err(|_| (original_tokens, ParsingError::from("Not an assignment².")))
+            } else {
+                Err((original_tokens, ParsingError::from("Not an assignment.")))
+            }
+        })
+    };
+
+    var_declaration(tokens)
+        .or_else(|(tokens, _)| assignment(tokens))
+        .or_else(|(tokens, _)| function_call(tokens))
+        .and_then(|(mut tokens, value)| {
+            if tokens.first() != Some(&Token::Semicolon) {
+                return Err((original_tokens, ParsingError::from("Expected a semicolon.")));
+            }
+
+            assert!(tokens.drop_first_mut());
+            Ok((tokens, value))
+        })
 }
 
 pub fn parse(code: &str) -> Result<Vec<AstNode>, ParsingError> {
@@ -462,13 +463,11 @@ pub fn parse(code: &str) -> Result<Vec<AstNode>, ParsingError> {
 
             Err((new_tokens, e)) => {
                 if !new_tokens.is_empty() {
-                    return Err(e);
+                    break Err(e);
+                } else {
+                    break Ok(result);
                 }
-
-                break;
             }
         }
     }
-
-    Ok(result)
 }
